@@ -1,21 +1,22 @@
+import { WalletType, signMsg } from '@/constants/wallet'
+import { useAuth } from './useAuth'
 import { ISignIn } from '@/services/auth/type'
-import { Auth } from '@/services/auth'
-import { useAppDispatch } from '@/store/hooks'
-import { setAuth } from '@/store/features/authSlice'
-import { WalletType } from '@/constants/wallet'
+import React from 'react'
 
 interface IParams {
-  onError: () => void
+  onError: (err: any) => void
 }
 
 export const useUnisat = ({ onError }: IParams) => {
-  const dispatch = useAppDispatch()
+  const auth = useAuth()
+
+  const isInstalled = React.useMemo(() => !!(window as any).unisat, [])
 
   const connect = async () => {
     try {
       const unisat = (window as any).unisat
 
-      const signature = await unisat.signMessage('RuneAlpha')
+      const signature = await unisat.signMessage(signMsg)
       const [walletAddress, publicKey] = await Promise.all([
         unisat.getAccounts(),
         unisat.getPublicKey()
@@ -27,22 +28,15 @@ export const useUnisat = ({ onError }: IParams) => {
         signature,
         walletType: WalletType.UNISAT
       }
-      // signin
-      const res = await Auth.signIn(req)
 
-      dispatch(
-        setAuth({
-          ordinalsAddress: '',
-          paymentAddress: walletAddress[0],
-          accessToken: res?.data?.accessToken
-        })
-      )
-    } catch {
-      onError()
+      auth.signIn(req, {})
+    } catch (err) {
+      onError(err)
     }
   }
 
   return {
-    connect
+    connect,
+    isInstalled
   }
 }

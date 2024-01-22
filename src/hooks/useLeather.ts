@@ -1,9 +1,7 @@
 import { ISignIn } from '@/services/auth/type'
-import { Auth } from '@/services/auth'
-import { useAppDispatch } from '@/store/hooks'
-import { setAuth } from '@/store/features/authSlice'
-import { WalletType } from '@/constants/wallet'
-import { notification } from 'antd'
+import { WalletType, signMsg } from '@/constants/wallet'
+import { useAuth } from './useAuth'
+import React from 'react'
 
 enum TypeAddress {
   Ordinals = 'p2tr',
@@ -19,11 +17,13 @@ interface IAddress {
 }
 
 interface IParams {
-  onError: () => void
+  onError: (err: any) => void
 }
 
 export const useLeather = ({ onError }: IParams) => {
-  const dispatch = useAppDispatch()
+  const auth = useAuth()
+
+  const isInstalled = React.useMemo(() => !!(window as any).btc, [])
 
   const signAppMsg = async (addresses: IAddress[]) => {
     const paymentAddr = addresses?.find((i) => i.type === TypeAddress.Payment)
@@ -33,7 +33,7 @@ export const useLeather = ({ onError }: IParams) => {
 
     try {
       const response = await (window as any).btc.request('signMessage', {
-        message: 'RuneAlpha',
+        message: signMsg,
         paymentType: TypeAddress.Payment
       })
 
@@ -45,18 +45,13 @@ export const useLeather = ({ onError }: IParams) => {
         signature: response.result.signature,
         walletType: WalletType.LEATHER
       }
-      // signin
-      const res = await Auth.signIn(req)
 
-      dispatch(
-        setAuth({
-          ordinalsAddress: ordinalsAddr?.address,
-          paymentAddress: paymentAddr?.address,
-          accessToken: res?.data?.accessToken
-        })
-      )
-    } catch {
-      onError()
+      // signin
+      auth.signIn(req, {
+        ordinalsAddress: ordinalsAddr?.address
+      })
+    } catch (err) {
+      onError(err)
     }
   }
 
@@ -64,12 +59,13 @@ export const useLeather = ({ onError }: IParams) => {
     try {
       const userAddresses = await (window as any).btc?.request('getAddresses')
       signAppMsg(userAddresses.result.addresses)
-    } catch {
-      onError()
+    } catch (err) {
+      onError(err)
     }
   }
 
   return {
-    connect
+    connect,
+    isInstalled
   }
 }

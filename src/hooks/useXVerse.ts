@@ -8,17 +8,18 @@ import {
   signMessage
 } from 'sats-connect'
 import { ISignIn } from '@/services/auth/type'
-import { Auth } from '@/services/auth'
-import { useAppDispatch } from '@/store/hooks'
-import { setAuth } from '@/store/features/authSlice'
-import { WalletType } from '@/constants/wallet'
+import { WalletType, signMsg } from '@/constants/wallet'
+import { useAuth } from './useAuth'
+import React from 'react'
 
 interface IParams {
-  onError: () => void
+  onError: (err: any) => void
 }
 
 export const useXVerse = ({ onError }: IParams) => {
-  const dispatch = useAppDispatch()
+  const auth = useAuth()
+
+  const isInstalled = React.useMemo(() => !!(window as any).XverseProviders, [])
 
   const signAppMsg = async (addresses: Address[]) => {
     const paymentAddr = addresses.find((i) => i.purpose === AddressPurpose.Payment)
@@ -32,7 +33,7 @@ export const useXVerse = ({ onError }: IParams) => {
           type: BitcoinNetworkType.Testnet
         },
         address: paymentAddr.address,
-        message: 'RuneAlpha'
+        message: signMsg
       },
       onFinish: async (signature) => {
         const req: ISignIn = {
@@ -41,18 +42,13 @@ export const useXVerse = ({ onError }: IParams) => {
           signature,
           walletType: WalletType.XVERSE
         }
-        // signin
-        const res = await Auth.signIn(req)
 
-        dispatch(
-          setAuth({
-            ordinalsAddress: ordinalsAddr?.address,
-            paymentAddress: paymentAddr?.address,
-            accessToken: res?.data?.accessToken
-          })
-        )
+        // signin
+        auth.signIn(req, {
+          ordinalsAddress: ordinalsAddr?.address
+        })
       },
-      onCancel: () => onError()
+      onCancel: () => onError('Request cancel')
     }
 
     await signMessage(signMessageOptions)
@@ -71,13 +67,14 @@ export const useXVerse = ({ onError }: IParams) => {
         const addresses = response.addresses
         signAppMsg(addresses)
       },
-      onCancel: () => onError()
+      onCancel: () => onError('Request cancel')
     }
 
     await getAddress(getAddressOptions)
   }
 
   return {
-    connect
+    connect,
+    isInstalled
   }
 }

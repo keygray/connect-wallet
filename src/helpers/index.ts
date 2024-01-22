@@ -9,6 +9,10 @@ export const createPSBT = async (
   recipient1: string,
   amount: number
 ) => {
+  if (paymentUnspentOutputs.length === 0) {
+    throw new Error('No UTXOs available for payment')
+  }
+
   const network =
     networkType === BitcoinNetworkType.Testnet ? btc.networks.testnet : btc.networks.bitcoin
 
@@ -29,12 +33,12 @@ export const createPSBT = async (
   }
 
   const utxoDetails = await getUTXODetails(BitcoinNetworkType.Testnet, paymentOutput.txid)
-  const output = utxoDetails.vout[1]
+  const output = utxoDetails.vout[0]
 
   // payment input
   tx.addInput({
-    hash: paymentOutput.txid,
-    index: paymentOutput.vout,
+    hash: paymentOutput?.txid,
+    index: paymentOutput?.vout,
     witnessUtxo: {
       script: Buffer.from(output.scriptpubkey, 'hex'),
       value: paymentOutput.value
@@ -47,4 +51,9 @@ export const createPSBT = async (
   })
 
   return tx.toBase64()
+}
+
+export const bytesToBase64 = (bytes: any) => {
+  const binString = String.fromCodePoint(...bytes)
+  return btoa(binString)
 }
