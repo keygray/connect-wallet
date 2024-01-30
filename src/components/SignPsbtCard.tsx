@@ -1,5 +1,6 @@
 import { Button, Card, Input } from 'antd'
 import React from 'react'
+import Paragraph from 'antd/es/typography/Paragraph'
 
 const SignPsbtCard = () => {
   const [psbtHex, setPsbtHex] = React.useState('')
@@ -17,13 +18,18 @@ const SignPsbtCard = () => {
       </div>
       <div style={{ textAlign: 'left', marginTop: 10 }}>
         <div style={{ fontWeight: 'bold' }}>Result:</div>
-        <div style={{ wordWrap: 'break-word' }}>{psbtResult}</div>
+        {psbtResult && (
+          <Paragraph className="w-40" copyable ellipsis>
+            {psbtResult}
+          </Paragraph>
+        )}
       </div>
       <Button
         style={{ marginTop: 10 }}
         onClick={async () => {
           try {
             const psbtResult = await (window as any).unisat.signPsbt(psbtHex)
+
             setPsbtResult(psbtResult)
           } catch (e) {
             setPsbtResult((e as any).message)

@@ -2,17 +2,17 @@ import { Button, Card, Input } from 'antd'
 import React from 'react'
 
 const PushPsbtCard = () => {
-  const [rawtx, setRawtx] = React.useState('')
+  const [psbt, setPsbt] = React.useState('')
   const [txid, setTxid] = React.useState('')
 
   return (
     <Card size="small" title="Push Transaction Hex" style={{ width: 300, margin: 10 }}>
       <div style={{ textAlign: 'left', marginTop: 10 }}>
-        <div style={{ fontWeight: 'bold' }}>rawtx:</div>
+        <div style={{ fontWeight: 'bold' }}>PsbtHex:</div>
         <Input
-          defaultValue={rawtx}
+          defaultValue={psbt}
           onChange={(e) => {
-            setRawtx(e.target.value)
+            setPsbt(e.target.value)
           }}
         ></Input>
       </div>
@@ -24,7 +24,7 @@ const PushPsbtCard = () => {
         style={{ marginTop: 10 }}
         onClick={async () => {
           try {
-            const txid = await (window as any).unisat.pushTx(rawtx)
+            const txid = await (window as any).unisat.pushPsbt(psbt)
             setTxid(txid)
           } catch (e) {
             setTxid((e as any).message)

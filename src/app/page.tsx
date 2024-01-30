@@ -1,11 +1,8 @@
 'use client'
 import { Button, notification } from 'antd'
 import React from 'react'
-import { useXVerse } from '@/hooks/useXVerse'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { logOut } from '@/store/features/authSlice'
-import { useLeather } from '@/hooks/useLeather'
-import { useUnisat } from '@/hooks/useUnisat'
 import { createPSBT } from '@/helpers'
 import { BitcoinNetworkType } from 'sats-connect'
 import { getUTXOs } from '@/services/utxos'
@@ -43,7 +40,8 @@ export default function App() {
         BitcoinNetworkType.Testnet,
         paymentUnspentOutputs,
         toAddress,
-        1000
+        auth.paymentAddress,
+        302
       )
 
       setPsbt(psbtBase64)

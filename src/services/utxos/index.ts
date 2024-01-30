@@ -19,3 +19,11 @@ export const getUTXODetails = async (network: BitcoinNetworkType, txid: string):
 
   return response.data
 }
+
+export const getRecommendFee = async (network: BitcoinNetworkType): Promise<any> => {
+  const networkSubpath = network === BitcoinNetworkType.Testnet ? '/testnet' : ''
+  const url = `https://mempool.space${networkSubpath}/api/v1/fees/recommended`
+  const response = await axios.get(url)
+
+  return response.data
+}
