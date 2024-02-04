@@ -2,6 +2,8 @@ import { WalletType, signMsg } from '@/constants/wallet'
 import { useAuth } from './useAuth'
 import { ISignIn } from '@/services/auth/type'
 import React from 'react'
+import { finalizePsbt } from '../helpers'
+import { BitcoinNetworkType } from 'sats-connect'
 
 interface IParams {
   onError: (err: any) => void
@@ -35,8 +37,26 @@ export const useUnisat = ({ onError }: IParams) => {
     }
   }
 
+  const pushPsbt = async (hex: string) => {
+    try {
+      const signedHex = await (window as any).unisat.signPsbt(hex)
+
+      const finalTx = finalizePsbt({
+        data: signedHex,
+        type: 'hex',
+        networkType: BitcoinNetworkType.Testnet,
+        isFinalized: true
+      })
+
+      return finalTx
+    } catch (err) {
+      onError(err)
+    }
+  }
+
   return {
     connect,
+    pushPsbt,
     isInstalled
   }
 }

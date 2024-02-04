@@ -4,13 +4,17 @@ import {
   BitcoinNetworkType,
   GetAddressOptions,
   SignMessageOptions,
+  SignTransactionOptions,
   getAddress,
-  signMessage
+  signMessage,
+  signTransaction
 } from 'sats-connect'
 import { ISignIn } from '@/services/auth/type'
 import { WalletType, signMsg } from '@/constants/wallet'
 import { useAuth } from './useAuth'
 import React from 'react'
+import { finalizePsbt } from '../helpers'
+import { useAppSelector } from '../store/hooks'
 
 interface IParams {
   onError: (err: any) => void
@@ -18,6 +22,7 @@ interface IParams {
 
 export const useXVerse = ({ onError }: IParams) => {
   const auth = useAuth()
+  const authStore = useAppSelector((state) => state.auth)
 
   const isInstalled = React.useMemo(() => !!(window as any).XverseProviders, [])
 
@@ -73,8 +78,48 @@ export const useXVerse = ({ onError }: IParams) => {
     await getAddress(getAddressOptions)
   }
 
+  function hexToBase64Node(hexString: any) {
+    return Buffer.from(hexString, 'hex').toString('base64')
+  }
+
+  const pushPsbt =
+    (hex: string) => async (cb: (finalTx: string) => void, signingIndexes: number[]) => {
+      try {
+        const signPsbtOptions: SignTransactionOptions = {
+          payload: {
+            network: {
+              type: BitcoinNetworkType.Testnet
+            },
+            psbtBase64: hexToBase64Node(hex),
+            broadcast: false,
+            inputsToSign: [
+              {
+                address: authStore.paymentAddress,
+                signingIndexes
+              }
+            ],
+            message: ''
+          },
+          onFinish: (response) => {
+            const finalTx = finalizePsbt({
+              data: response.psbtBase64,
+              type: 'base64',
+              networkType: BitcoinNetworkType.Testnet
+            })
+            cb(finalTx)
+          },
+          onCancel: () => alert('Canceled')
+        }
+
+        await signTransaction(signPsbtOptions)
+      } catch (err) {
+        onError(err)
+      }
+    }
+
   return {
     connect,
+    pushPsbt,
     isInstalled
   }
 }

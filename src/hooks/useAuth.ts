@@ -2,6 +2,7 @@ import { Auth } from '@/services/auth'
 import { setAuth } from '@/store/features/authSlice'
 import { ISignIn } from '@/services/auth/type'
 import { useAppDispatch } from '@/store/hooks'
+import { setAccessToken } from '@/http'
 
 interface IOptions {
   ordinalsAddress?: string
@@ -18,9 +19,12 @@ export const useAuth = () => {
       setAuth({
         ordinalsAddress,
         paymentAddress: req.walletAddress,
-        accessToken: res?.data?.accessToken
+        publicKey: req.publicKey,
+        accessToken: res?.data?.accessToken,
+        walletType: req.walletType
       })
     )
+    setAccessToken(res?.data?.accessToken)
   }
 
   return {

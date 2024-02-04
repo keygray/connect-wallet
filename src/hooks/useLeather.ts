@@ -2,6 +2,10 @@ import { ISignIn } from '@/services/auth/type'
 import { WalletType, signMsg } from '@/constants/wallet'
 import { useAuth } from './useAuth'
 import React from 'react'
+import { BitcoinNetworkType } from 'sats-connect'
+import { pushPsbt } from '@/services/utxos'
+import * as btc from 'bitcoinjs-lib'
+import { finalizePsbt } from '../helpers'
 
 enum TypeAddress {
   Ordinals = 'p2tr',
@@ -64,8 +68,25 @@ export const useLeather = ({ onError }: IParams) => {
     }
   }
 
+  const pushPsbt = async (hex: string) => {
+    try {
+      const signedPsbt = await (window as any).btc.request('signPsbt', {
+        hex
+      })
+      const finalTx = finalizePsbt({
+        data: signedPsbt.result.hex,
+        type: 'hex',
+        networkType: BitcoinNetworkType.Testnet
+      })
+      return finalTx
+    } catch (err) {
+      onError(err)
+    }
+  }
+
   return {
     connect,
+    pushPsbt,
     isInstalled
   }
 }

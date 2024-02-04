@@ -2,6 +2,8 @@ import { ISignIn } from '@/services/auth/type'
 import { WalletType, signMsg } from '@/constants/wallet'
 import { useAuth } from './useAuth'
 import React from 'react'
+import { finalizePsbt } from '../helpers'
+import { BitcoinNetworkType } from 'sats-connect'
 
 type BtcAccount = {
   address: string
@@ -35,7 +37,7 @@ export const useOKX = ({ onError }: IParams) => {
         walletAddress: account.address,
         publicKey: account.publicKey,
         signature,
-        walletType: WalletType.PHANTOM
+        walletType: WalletType.OKX
       }
 
       auth.signIn(req, {})
@@ -54,8 +56,27 @@ export const useOKX = ({ onError }: IParams) => {
     }
   }
 
+  const pushPsbt = async (hex: string) => {
+    try {
+      const okxwallet = (window as any).okxwallet
+      const signedHex = await okxwallet.bitcoinTestnet.signPsbt(hex)
+
+      const finalTx = finalizePsbt({
+        data: signedHex,
+        type: 'hex',
+        networkType: BitcoinNetworkType.Testnet,
+        isFinalized: true
+      })
+
+      return finalTx
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
   return {
     connect,
+    pushPsbt,
     isInstalled
   }
 }

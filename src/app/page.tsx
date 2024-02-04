@@ -1,60 +1,161 @@
 'use client'
-import { Button, notification } from 'antd'
+import { Button, Form, notification } from 'antd'
 import React from 'react'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { logOut } from '@/store/features/authSlice'
-import { createPSBT } from '@/helpers'
+import { createPsbt, openUrlNewTab } from '@/helpers'
 import { BitcoinNetworkType } from 'sats-connect'
-import { getUTXOs } from '@/services/utxos'
-import PushPsbtCard from '@/components/PushPsbtCard'
-import SignPsbtCard from '@/components/SignPsbtCard'
-import Paragraph from 'antd/es/typography/Paragraph'
-import { Wallets } from '../components/Wallets'
+import { useLeather, useOKX, usePhantom, useUnisat, useXVerse } from '@/hooks'
+import { Wallets } from '@/components/Wallets'
 import { isString } from 'antd/es/button'
+import BroadcastCard from '@/components/BroadcastCard'
+import { WalletType } from '@/constants/wallet'
+import { getUTXOs, pushPsbt } from '@/services/utxos/index'
+
+interface IBroadCastPsbt {
+  address: string
+  value: number
+}
 
 export default function App() {
   const [api, contextHolder] = notification.useNotification()
+  const [broadcastForm] = Form.useForm()
 
   /** Store */
   const dispath = useAppDispatch()
-  const auth = useAppSelector((state) => state.auth)
-  const [psbt, setPsbt] = React.useState<string>()
+  const authStore = useAppSelector((state) => state.auth)
+  const [txId, setTxId] = React.useState('')
 
   /** Event */
-  const showError = (err: any) => {
+  const onError = (err: any) => {
     api['error']({
       message: 'Error',
       description: isString(err?.message) ? err?.message : 'Request cancel'
     })
   }
 
+  const onPushPsbtSuccess = (txId: string) => {
+    broadcastForm.resetFields()
+    api['success']({
+      message: 'Success',
+      description: 'Push psbt successs'
+    })
+    setTxId(txId)
+  }
+
   const handleLogOut = React.useCallback(() => {
     dispath(logOut())
   }, [dispath])
 
-  const handleCreatePsbt = async () => {
-    try {
-      const toAddress = 'tb1q7h6h4d8akfcm42zvs99f5nym650c8twjzrh5a2'
-      const paymentUnspentOutputs = await getUTXOs(BitcoinNetworkType.Testnet, auth.paymentAddress)
-      const psbtBase64 = await createPSBT(
-        BitcoinNetworkType.Testnet,
-        paymentUnspentOutputs,
-        toAddress,
-        auth.paymentAddress,
-        302
-      )
+  /** Wallet Config */
+  const XVerseWallet = useXVerse({
+    onError
+  })
+  const LeatherWallet = useLeather({
+    onError
+  })
+  const UnisatWallet = useUnisat({
+    onError
+  })
+  const PhantomWallet = usePhantom({
+    onError
+  })
+  const OkxWallet = useOKX({
+    onError
+  })
 
-      setPsbt(psbtBase64)
+  const walletConfig = React.useMemo(
+    () => ({
+      XVERSE: {
+        title: 'XVerse',
+        onConnect: XVerseWallet.connect,
+        isInstalled: XVerseWallet.isInstalled,
+        openExtensionUrl: () => openUrlNewTab(WalletType.XVERSE),
+        push: XVerseWallet.pushPsbt
+      },
+      LEATHER: {
+        title: 'Leather',
+        onConnect: LeatherWallet.connect,
+        isInstalled: LeatherWallet.isInstalled,
+        openExtensionUrl: () => openUrlNewTab(WalletType.LEATHER),
+        push: LeatherWallet.pushPsbt
+      },
+      UNISAT: {
+        title: 'Unisat',
+        onConnect: UnisatWallet.connect,
+        isInstalled: UnisatWallet.isInstalled,
+        openExtensionUrl: () => openUrlNewTab(WalletType.UNISAT),
+        push: UnisatWallet.pushPsbt
+      },
+      PHANTOM: {
+        title: 'Phantom (BTC)',
+        onConnect: PhantomWallet.connect,
+        isInstalled: PhantomWallet.isInstalled,
+        openExtensionUrl: () => openUrlNewTab(WalletType.PHANTOM),
+        push: () => {}
+      },
+      OKX: {
+        title: 'OKX',
+        onConnect: OkxWallet.connect,
+        isInstalled: OkxWallet.isInstalled,
+        openExtensionUrl: () => openUrlNewTab(WalletType.OKX),
+        push: OkxWallet.pushPsbt
+      }
+    }),
+    [authStore]
+  )
+
+  const push = async (signedHex: string) => {
+    const txId = await pushPsbt(BitcoinNetworkType.Testnet, signedHex)
+    onPushPsbtSuccess(txId)
+  }
+
+  const broadCastPsbt = async ({ address, value }: IBroadCastPsbt) => {
+    try {
+      const utxos = await getUTXOs(BitcoinNetworkType.Testnet, authStore.paymentAddress)
+
+      const psbtHex = await createPsbt({
+        networkType: BitcoinNetworkType.Testnet,
+        currentWallet: {
+          publicKey: authStore.publicKey,
+          address: authStore.paymentAddress
+        },
+        recipients: [
+          {
+            address,
+            value
+          }
+        ],
+        utxos
+      })
+
+      if (!authStore.walletType || !psbtHex) return
+
+      const result = await walletConfig[authStore.walletType].push(psbtHex)
+      if (!result) return
+
+      if (typeof result === 'string') {
+        push(result)
+        return
+      }
+
+      if (authStore.walletType === WalletType.XVERSE) {
+        result(
+          push,
+          utxos.map((_, index) => index)
+        )
+        return
+      }
     } catch (err) {
-      showError(err)
+      onError(err)
     }
   }
 
-  if (!auth.accessToken) {
+  if (!authStore.accessToken) {
     return (
       <>
         {contextHolder}
-        <Wallets onError={showError} />
+        <Wallets config={Object.values(walletConfig)} />
       </>
     )
   }
@@ -64,28 +165,25 @@ export default function App() {
       {contextHolder}
       <div className="flex items-center justify-center flex-col gap-4 h-screen w-full">
         <div className="flex justify-center flex-col gap-4">
-          {auth.ordinalsAddress && (
+          {authStore.ordinalsAddress && (
             <div>
               <h1 className="text-lime-400">Ordinals</h1>
-              <span>{auth.ordinalsAddress}</span>
+              <span>{authStore.ordinalsAddress}</span>
             </div>
           )}
           <div>
             <h1 className="text-lime-500">Payment</h1>
-            <span>{auth.paymentAddress}</span>
+            <span>{authStore.paymentAddress}</span>
           </div>
         </div>
-        <Button style={{ marginTop: 10 }} onClick={handleCreatePsbt}>
-          Create Psbt
-        </Button>
-        {psbt && (
-          <Paragraph className="w-40" copyable ellipsis>
-            {psbt}
-          </Paragraph>
-        )}
 
-        <SignPsbtCard />
-        <PushPsbtCard />
+        <BroadcastCard
+          onFinish={broadCastPsbt}
+          onFailed={onError}
+          txId={txId}
+          form={broadcastForm}
+        />
+
         <Button type="primary" className="bg-neutral-900" onClick={handleLogOut}>
           Disconnect
         </Button>
